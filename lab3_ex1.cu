@@ -86,7 +86,7 @@ int main(int argc, char **argv)
 
   //@@ Initialize the 1D grid and block dimensions here
   int threads_per_block = 512;
-  int blocks = inputLength / threads_per_block + 1;
+  int blocks = std::ceil(inputLength / (float)threads_per_block);
   printf("TPB: %d\n", threads_per_block);
   printf("Blocks: %d\n", blocks);
 
