@@ -125,13 +125,13 @@ int main(int argc, char **argv)
   cudaFree(deviceInput1);
   cudaFree(deviceInput2);
   cudaFree(deviceOutput);
+  cudaDeviceReset();
 
   //@@ Free the CPU memory here
   free(hostInput1);
   free(hostInput2);
   free(hostOutput);
-
-  cudaDeviceReset();
+  free(resultRef);
 
   return 0;
 }

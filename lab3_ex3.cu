@@ -2,6 +2,8 @@
 #include <stdio.h>
 #include <sys/time.h>
 #include <random>
+#include <fstream>
+#include <iostream>
 
 #define NUM_BINS 4096
 
@@ -35,31 +37,30 @@ __global__ void histogram_kernel(unsigned int *input, unsigned int *bins,
   int blockId = threadIdx.x;
   __shared__ int shared[NUM_BINS];
 
-    for (int i = blockId; i < NUM_BINS; i += blockDim.x) {
-    //printf("aggreg %i\n", i);
+  for (int i = blockId; i < num_bins; i += blockDim.x)
+  {
     shared[i] = 0;
-    //bins[i] += shared[i];
   }
-    __syncthreads();
+  __syncthreads();
 
   if (id < num_elements)
   {
     atomicAdd(&shared[input[id]], 1);
-
   }
-    __syncthreads();
+  __syncthreads();
 
-  for (int i = blockId; i < NUM_BINS; i += blockDim.x) {
-    //printf("aggreg %i\n", i);
+  for (int i = blockId; i < num_bins; i += blockDim.x)
+  {
     atomicAdd(&bins[i], shared[i]);
-    //bins[i] += shared[i];
   }
 }
 
 __global__ void convert_kernel(unsigned int *bins, unsigned int num_bins)
 {
-
   //@@ Insert code below to clean up bins that saturate at 127
+  int i = threadIdx.x + blockDim.x * blockIdx.x;
+  if (i < num_bins && bins[i] > 127)
+    bins[i] = 127;
 }
 
 //@@ Insert code to implement timer start
@@ -71,7 +72,7 @@ double startTimer()
 }
 
 //@@ Insert code to implement timer stop
-void stopTimer(double start, const char* title)
+void stopTimer(double start, const char *title)
 {
   printf("Timer for %s: %lf\n", title, startTimer() - start);
 }
@@ -103,7 +104,8 @@ int main(int argc, char **argv)
   unsigned int lower_bound = 0;
   unsigned int upper_bound = NUM_BINS - 1;
   std::uniform_int_distribution<unsigned int> unif(lower_bound, upper_bound);
-  //std::default_random_engine re(std::random_device{}());
+  std::binomial_distribution<unsigned int> normal(lower_bound, upper_bound);
+  // std::default_random_engine re(std::random_device{}());
   std::default_random_engine re;
   for (int i = 0; i < inputLength; i++)
   {
@@ -111,10 +113,13 @@ int main(int argc, char **argv)
   }
 
   //@@ Insert code below to create reference result in CPU
+  double iStart = startTimer();
   for (int i = 0; i < inputLength; i++)
   {
-    resultRef[hostInput[i]] += 1;
+    if (resultRef[hostInput[i]] < 127)
+      resultRef[hostInput[i]] += 1;
   }
+  stopTimer(iStart, "CPU execution");
 
   //@@ Insert code below to allocate GPU memory here
   cudaMalloc(&deviceInput, sizeof(unsigned int) * inputLength);
@@ -128,38 +133,55 @@ int main(int argc, char **argv)
 
   //@@ Initialize the grid and block dimensions here
   int threads_per_block = 768;
-  int blocks = ceil(inputLength/(float)threads_per_block);
+  int blocks = ceil(inputLength / (float)threads_per_block);
   printf("%d blocks launched\n", blocks);
 
   //@@ Launch the GPU Kernel here
-  double iStart = startTimer();
+  iStart = startTimer();
   histogram_kernel<<<blocks, threads_per_block>>>(deviceInput, deviceBins, inputLength, NUM_BINS);
   cudaDeviceSynchronize();
   stopTimer(iStart, "Kernel exec");
 
   //@@ Initialize the second grid and block dimensions here
+  blocks = ceil(NUM_BINS / (float)threads_per_block);
+  printf("%d blocks launched\n", blocks);
 
   //@@ Launch the second GPU Kernel here
+  convert_kernel<<<blocks, threads_per_block>>>(deviceBins, NUM_BINS);
 
   //@@ Copy the GPU memory back to the CPU here
   cudaMemcpy(hostBins, deviceBins, sizeof(unsigned int) * NUM_BINS, cudaMemcpyDeviceToHost);
 
   //@@ Insert code below to compare the output with the reference
+  std::ofstream outfile;
+
+  outfile.open("result.txt", std::ios_base::out); // append instead of overwrite
+
   bool isEqual = true;
+
   for (int i = 0; i < NUM_BINS; i++)
   {
-    //printf("dev bin: %d %d - ref bin: %d %d\n", i, hostBins[i], i, resultRef[i]);
-    if (hostBins[i] != resultRef[i]) {
+    // printf("dev bin: %d %d - ref bin: %d %d\n", i, hostBins[i], i, resultRef[i]);
+    outfile << hostBins[i] << std::endl;
+    if (hostBins[i] != resultRef[i])
+    {
       isEqual = false;
       printf("Error at %d: %d != %d\n", i, resultRef[i], hostBins[i]);
     }
   }
 
-  if (isEqual) printf("is equal %d\n", isEqual);
+  if (isEqual)
+    printf("is equal %d\n", isEqual);
 
   //@@ Free the GPU memory here
+  cudaFree(deviceInput);
+  cudaFree(deviceBins);
+  cudaDeviceReset();
 
   //@@ Free the CPU memory here
+  free(hostInput);
+  free(hostBins);
+  free(resultRef);
 
   return 0;
 }
