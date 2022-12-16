@@ -96,7 +96,7 @@ int main(int argc, char **argv)
   double lower_bound = 0;
   double upper_bound = 10;
   std::uniform_real_distribution<double> unif(lower_bound, upper_bound);
-  std::default_random_engine re;
+  std::default_random_engine re(std::random_device{}());
   for (int i = 0; i < numARows * numAColumns; i++)
   {
     hostA[i] = unif(re);
@@ -107,18 +107,18 @@ int main(int argc, char **argv)
     hostB[i] = unif(re);
   }
 
-  // for (int i = 0; i < numCRows * numCColumns; i++)
-  // {
-  //   int row = i % numCColumns;
-  //   int col = i / numCColumns;
+  for (int i = 0; i < numCRows * numCColumns; i++)
+  {
+    int row = i % numCColumns;
+    int col = i / numCColumns;
 
-  //   resultRef[i] = 0;
+    resultRef[i] = 0;
 
-  //   for (int j = 0; j < numAColumns; j++)
-  //   {
-  //     resultRef[i] += hostA[j + col * numAColumns] * hostB[row + j * numBColumns];
-  //   }
-  // }
+    for (int j = 0; j < numAColumns; j++)
+    {
+      resultRef[i] += hostA[j + col * numAColumns] * hostB[row + j * numBColumns];
+    }
+  }
 
   //printMatrix(hostA, numARows, numAColumns);
   //printMatrix(hostB, numBRows, numBColumns);
@@ -136,9 +136,10 @@ int main(int argc, char **argv)
   stopTimer(iStart, "Copy host->device");
 
   //@@ Initialize the grid and block dimensions here
-  int threads_per_block_dimension = 32; // Max 32 as 32^2 = 1024
-  int num_blocks_x = ceil(numCColumns / (float)32);
-  int num_blocks_y = ceil(numCRows / (float)24);
+  int threads_per_block_x = 32;
+  int threads_per_block_y = 24;
+  int num_blocks_x = ceil(numCColumns / (float) threads_per_block_x);
+  int num_blocks_y = ceil(numCRows / (float) threads_per_block_y);
   printf("Blocks: %d x %d\n", num_blocks_x, num_blocks_y);
 
   //@@ Launch the GPU Kernel here
@@ -150,17 +151,17 @@ int main(int argc, char **argv)
   //@@ Copy the GPU memory back to the CPU here
   iStart = startTimer();
   cudaMemcpy(hostC, deviceC, numCRows * numCColumns * sizeof(DataType), cudaMemcpyDeviceToHost);
-  stopTimer(iStart, "Cope device->host");
+  stopTimer(iStart, "Copy device->host");
 
   //@@ Insert code below to compare the output with the reference
   //printMatrix(hostC, numCRows, numCColumns);
   bool isEqual = true;
-  // for (int i = 0; i < numCRows * numCColumns; i++) {
-  //   if (std::abs(hostC[i] - resultRef[i]) >= 0.00000001) {
-  //     isEqual = false;
-  //     printf("/!\\ %f != %f on id %d\n", hostC[i], resultRef[i], i);
-  //   }
-  // }
+  for (int i = 0; i < numCRows * numCColumns; i++) {
+    if (std::abs(hostC[i] - resultRef[i]) >= 0.00000001) {
+      isEqual = false;
+      printf("/!\\ %f != %f on id %d\n", hostC[i], resultRef[i], i);
+    }
+  }
 
   if (isEqual) {
     printf("Matrices are equal!\n");

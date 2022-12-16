@@ -17,12 +17,6 @@ __global__ void histogram_kernel_global(unsigned int *input, unsigned int *bins,
 
   if (id < num_elements)
   {
-    // __shared__ int shared[NUM_BINS];
-
-    // atomicAdd(shared + input[id], 1);
-
-    // __syncthreads();
-
     atomicAdd(&bins[input[id]], 1);
   }
 }
@@ -105,8 +99,7 @@ int main(int argc, char **argv)
   unsigned int upper_bound = NUM_BINS - 1;
   std::uniform_int_distribution<unsigned int> unif(lower_bound, upper_bound);
   std::binomial_distribution<unsigned int> normal(lower_bound, upper_bound);
-  // std::default_random_engine re(std::random_device{}());
-  std::default_random_engine re;
+  std::default_random_engine re(std::random_device{}());
   for (int i = 0; i < inputLength; i++)
   {
     hostInput[i] = unif(re);
@@ -155,13 +148,12 @@ int main(int argc, char **argv)
   //@@ Insert code below to compare the output with the reference
   std::ofstream outfile;
 
-  outfile.open("result.txt", std::ios_base::out); // append instead of overwrite
+  outfile.open("result.txt", std::ios_base::out); // write the results in a file to draw the histogram
 
   bool isEqual = true;
 
   for (int i = 0; i < NUM_BINS; i++)
   {
-    // printf("dev bin: %d %d - ref bin: %d %d\n", i, hostBins[i], i, resultRef[i]);
     outfile << hostBins[i] << std::endl;
     if (hostBins[i] != resultRef[i])
     {

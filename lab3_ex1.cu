@@ -59,7 +59,7 @@ int main(int argc, char **argv)
   double lower_bound = 0;
   double upper_bound = 10;
   std::uniform_real_distribution<double> unif(lower_bound, upper_bound);
-  std::default_random_engine re;
+  std::default_random_engine re(std::random_device{}());
   double s = startTimer();
   for (int i = 0; i < inputLength; i++)
   {

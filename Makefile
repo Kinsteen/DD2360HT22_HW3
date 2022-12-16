@@ -1,5 +1,6 @@
 
-NVCC_OPTIONS = -g -std=c++14
+ARCH = sm_86
+NVCC_OPTIONS = -g -std=c++14 -arch=$(ARCH)
 
 all: lab3_ex1 lab3_ex2 lab3_ex3
 
