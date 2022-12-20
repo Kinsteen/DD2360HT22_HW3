@@ -152,8 +152,11 @@ int main(int argc, char **argv)
 
   bool isEqual = true;
 
+  int number_of_samples = 0;
+
   for (int i = 0; i < NUM_BINS; i++)
   {
+    number_of_samples += hostBins[i];
     outfile << hostBins[i] << std::endl;
     if (hostBins[i] != resultRef[i])
     {
@@ -164,6 +167,8 @@ int main(int argc, char **argv)
 
   if (isEqual)
     printf("is equal %d\n", isEqual);
+  
+  printf("Number of calculated samples by the GPU, AFTER the conversion: %d\n", number_of_samples);
 
   //@@ Free the GPU memory here
   cudaFree(deviceInput);
